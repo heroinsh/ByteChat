@@ -23,6 +23,15 @@ ByteChat is a fast and secure chatroom designed specifically for developers. It 
 
 ## Installation
 
+# Automatic (recommended for Ubuntu 22.04)
+You can directly download and run the `setup.sh` script using `curl`:
+
+```
+curl -O https://raw.githubusercontent.com/heroinsh/ByteChat/main/setup.sh
+chmod +x setup.sh
+./setup.sh
+```
+manual
 1. Clone this repository:
    ```
    git clone https://github.com/heroinsh/ByteChat.git
