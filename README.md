@@ -40,6 +40,6 @@ python -m uvicorn main:app --reload
 Open your browser and navigate to http://127.0.0.1:8000 to start using the chat.
 
 License
-Distributed under the MIT License. See LICENSE for more information.
+Distributed under the  CC BY-NC License. See LICENSE for more information.
 
 "Pain or pleasure doesn't last, but the pride or shame of your work does." — Vito
