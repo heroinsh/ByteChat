@@ -26,7 +26,8 @@ ByteChat is a fast and secure chatroom designed specifically for developers. It 
 1. Clone this repository:
    ```
    git clone https://github.com/heroinsh/ByteChat.git
-   cd ByteChat```
+   cd ByteChat
+   ```
 Install the required dependencies:
 
 ```
