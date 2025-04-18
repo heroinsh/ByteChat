@@ -1,0 +1,19 @@
+Copyright [2025] heroinsh
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, but only under the following conditions:
+
+1. **Non-Commercial Use**: You may not use the Software for any commercial purposes unless you obtain explicit written permission from the copyright holder (heroinsh). Any attempt to sell, lease, or otherwise commercially exploit the Software without prior written consent is strictly prohibited.
+
+2. **Modification & Distribution**: You are allowed to modify, distribute, and/or create derivative works of the Software, but any distribution of the Software or its derivatives must be accompanied by the same terms of this license. In any case, you must include the full text of this license and appropriate credits to the original author.
+
+3. **Attribution**: If you modify and/or distribute the Software, you must give credit to the original author (heroinsh). This includes providing proper attribution in any public or private distribution or use of the Software, including all source and binary forms.
+
+4. **No Warranty**: The Software is provided "as is", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, or non-infringement. In no event shall the copyright holder be liable for any claim, damages, or other liability, whether in an action of contract, tort, or otherwise, arising from, out of, or in connection with the Software or the use or other dealings in the Software.
+
+5. **Commercial Use**: Any commercial use of the Software, including but not limited to selling, licensing, or incorporating it into commercial products, requires the explicit written permission of the copyright holder. Unauthorized commercial use of the Software is strictly prohibited and will be subject to legal action.
+
+6. **Termination of License**: This license is effective until terminated. Your rights under this license will terminate automatically without notice if you fail to comply with any terms of this license. Upon termination, you must destroy all copies of the Software and cease using it.
+
+By using, copying, modifying, or distributing the Software, you agree to be bound by the terms of this license.
+
+Full license terms: [Your License URL or Contact Information]
