@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>چت روم</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="chat-box">
+            <div class="chat-header">
+                <h2>چت روم</h2>
+                <div class="connection-status">
+                    <span id="status">متصل</span>
+                </div>
+            </div>
+            <div class="chat-messages" id="messages">
+                <!-- Messages will be added here dynamically -->
+            </div>
+            <div class="chat-input">
+                <input type="text" id="messageInput" placeholder="پیام خود را بنویسید...">
+                <input type="file" id="fileInput" style="display: none;">
+                <button id="sendButton">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+                <button onclick="document.getElementById('fileInput').click()">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+            </div>
+        </div>
+        <div class="users-list">
+            <div class="users-header">
+                <h2>کاربران آنلاین</h2>
+            </div>
+            <div class="users" id="usersList">
+                <!-- Users will be added here dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/chat.js"></script>
+</body>
+</html> 

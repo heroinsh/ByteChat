@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ByteChat</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/chat.css">
+</head>
+<body>
+    <div class="chat-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="profile-section">
+                <div class="profile-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="profile-info">
+                    <h3>{{ username }}</h3>
+                    <p>ID: {{ user_id }}</p>
+                </div>
+                <button class="edit-profile-btn" onclick="showProfileModal()">
+                    <i class="fas fa-edit"></i>
+                </button>
+            </div>
+            
+            <div class="chat-list">
+                <div class="chat-item active" onclick="selectChat('public')">
+                    <div class="chat-avatar">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="chat-info">
+                        <span class="chat-name">چت عمومی</span>
+                        <span class="chat-status">آنلاین</span>
+                    </div>
+                </div>
+                <div id="privateChats">
+                    <!-- Private chats will be added here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Chat Area -->
+        <div class="chat-area">
+            <div class="chat-header">
+                <div class="chat-info">
+                    <h2 id="chatTitle">چت عمومی</h2>
+                    <p id="typingStatus"></p>
+                </div>
+                <div class="connection-status" id="connectionStatus">
+                    <i class="fas fa-circle"></i>
+                    <span>در حال اتصال...</span>
+                </div>
+            </div>
+            
+            <div class="messages" id="messages">
+                <!-- Messages will be populated here -->
+            </div>
+            
+            <div class="chat-input">
+                <div class="input-group">
+                    <div class="input-wrapper">
+                        <button class="emoji-btn" onclick="toggleEmojiPicker()">
+                            <i class="far fa-smile"></i>
+                        </button>
+                        <input type="text" id="messageInput" placeholder="پیام خود را بنویسید...">
+                        <button class="send-btn" onclick="sendMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                    <div class="file-upload">
+                        <input type="file" id="fileInput" style="display: none">
+                        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Profile Modal -->
+    <div class="modal" id="profileModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>ویرایش پروفایل</h3>
+                <button class="close-btn" onclick="hideProfileModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>نام نمایشی</label>
+                    <input type="text" id="displayName" value="{{ username }}">
+                </div>
+                <div class="form-group">
+                    <label>شناسه چت</label>
+                    <div class="copy-field">
+                        <input type="text" id="chatId" value="{{ user_id }}" readonly>
+                        <button class="copy-btn" onclick="copyChatId()">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>لینک دعوت</label>
+                    <div class="copy-field">
+                        <input type="text" id="inviteLink" value="http://localhost:8000/invite/{{ user_id }}" readonly>
+                        <button class="copy-btn" onclick="copyInviteLink()">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="save-btn" onclick="updateProfile()">ذخیره تغییرات</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let ws = null;
+        let userId = parseInt('{{ user_id }}');
+        let selectedChatId = {% if selected_chat %}{{ selected_chat.id }}{% else %}null{% endif %};
+        let messageQueue = [];
+        let isTyping = false;
+        let typingTimeout = null;
+        
+        // Initialize selected chat if provided
+        {% if selected_chat %}
+        document.addEventListener('DOMContentLoaded', function() {
+            startPrivateChat({{ selected_chat.id }}, '{{ selected_chat.display_name or selected_chat.username }}');
+        });
+        {% endif %}
+        
+        async function connectWebSocket() {
+            try {
+                updateConnectionStatus(false);
+                ws = new WebSocket(`ws://${window.location.host}/ws/${userId}`);
+                
+                ws.onopen = () => {
+                    updateConnectionStatus(true);
+                    // Send any queued messages
+                    while (messageQueue.length > 0) {
+                        const message = messageQueue.shift();
+                        ws.send(JSON.stringify(message));
+                    }
+                };
+                
+                ws.onclose = async (event) => {
+                    updateConnectionStatus(false);
+                    console.log('WebSocket connection closed:', event);
+                    // Try to reconnect after 5 seconds
+                    setTimeout(connectWebSocket, 5000);
+                };
+                
+                ws.onerror = (error) => {
+                    updateConnectionStatus(false);
+                    console.error('WebSocket error:', error);
+                };
+                
+                ws.onmessage = (event) => {
+                    const message = JSON.parse(event.data);
+                    
+                    if (message.type === 'message') {
+                        displayMessage(message);
+                    } else if (message.type === 'system') {
+                        displaySystemMessage(message);
+                    } else if (message.type === 'status') {
+                        updateOnlineUsers(message.users);
+                    } else if (message.type === 'typing') {
+                        updateTypingStatus(message.users);
+                    }
+                };
+            } catch (error) {
+                console.error('Error connecting to WebSocket:', error);
+                updateConnectionStatus(false);
+                // Try to reconnect after 5 seconds
+                setTimeout(connectWebSocket, 5000);
+            }
+        }
+        
+        function updateConnectionStatus(connected) {
+            const statusElement = document.getElementById('connectionStatus');
+            if (connected) {
+                statusElement.innerHTML = '<i class="fas fa-circle connected"></i> متصل';
+                statusElement.className = 'connection-status connected';
+            } else {
+                statusElement.innerHTML = '<i class="fas fa-circle disconnected"></i> در حال اتصال...';
+                statusElement.className = 'connection-status disconnected';
+            }
+        }
+        
+        function processMessageQueue() {
+            while (messageQueue.length > 0) {
+                const message = messageQueue.shift();
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify(message));
+                } else {
+                    messageQueue.unshift(message);
+                    break;
+                }
+            }
+        }
+        
+        // ارسال پیام
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const content = messageInput.value.trim();
+            
+            if (!content) return;
+            
+            const message = {
+                type: 'message',
+                content: content,
+                timestamp: new Date().toISOString()
+            };
+            
+            if (selectedChatId) {
+                message.receiver_id = selectedChatId;
+                message.is_private = true;
+            }
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(message));
+            } else {
+                messageQueue.push(message);
+            }
+            
+            messageInput.value = '';
+            messageInput.focus();
+        }
+        
+        // نمایش پیام
+        function displayMessage(message) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${message.sender_id === userId ? 'sent' : 'received'}`;
+            
+            const timestamp = message.timestamp ? new Date(message.timestamp).toLocaleTimeString('fa-IR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            }) : new Date().toLocaleTimeString('fa-IR', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            // Use display_name if available, otherwise use username, and fallback to 'کاربر ناشناس'
+            const senderName = message.display_name || message.username || 'کاربر ناشناس';
+            
+            let messageContent = message.content;
+            let fileDownloadButton = '';
+            
+            if (message.file_info) {
+                const fileType = message.file_info.type;
+                const fileIcon = fileType === 'image' ? 'fa-image' : 
+                                fileType === 'audio' ? 'fa-music' : 
+                                fileType === 'document' ? 'fa-file' : 'fa-file';
+                
+                messageContent = `
+                    <div class="file-message">
+                        <i class="fas ${fileIcon}"></i>
+                        <span>${message.content}</span>
+                        ${message.file_info.expired ? 
+                            '<span class="expired-badge">منقضی شده</span>' : 
+                            `<a href="${message.file_info.path}" download class="download-btn">
+                                <i class="fas fa-download"></i> دانلود
+                            </a>`
+                        }
+                    </div>
+                `;
+            }
+            
+            messageDiv.innerHTML = `
+                <div class="message-header">
+                    <span class="sender-name">${senderName}</span>
+                    <span class="message-time">${timestamp}</span>
+                </div>
+                <div class="message-content">${messageContent}</div>
+                ${message.sender_id === userId ? `
+                    <div class="message-actions">
+                        <button onclick="editMessage('${message.id}')" class="edit-btn">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteMessage('${message.id}')" class="delete-btn">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                ` : ''}
+            `;
+            
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        // نمایش پیام سیستم
+        function displaySystemMessage(message) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'system-message';
+            messageDiv.textContent = message.content;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        // به‌روزرسانی وضعیت تایپینگ
+        function updateTypingStatus(message) {
+            const typingStatus = document.getElementById('typingStatus');
+            if (message.content) {
+                typingStatus.textContent = message.content;
+                typingStatus.style.display = 'block';
+            } else {
+                typingStatus.style.display = 'none';
+            }
+        }
+        
+        // به‌روزرسانی لیست کاربران آنلاین
+        function updateOnlineUsers(users) {
+            const onlineUsersDiv = document.getElementById('onlineUsers');
+            onlineUsersDiv.innerHTML = '';
+            
+            users.forEach(user => {
+                const userDiv = document.createElement('div');
+                userDiv.className = `user ${user.online ? 'online' : 'offline'}`;
+                userDiv.innerHTML = `
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="user-info">
+                        <span class="user-name">${user.username}</span>
+                        <span class="user-status">${user.online ? 'آنلاین' : 'آفلاین'}</span>
+                    </div>
+                    <button class="chat-btn" onclick="startPrivateChat(${user.user_id})">
+                        <i class="fas fa-comment"></i>
+                    </button>
+                `;
+                onlineUsersDiv.appendChild(userDiv);
+            });
+        }
+        
+        // شروع چت خصوصی
+        function startPrivateChat(userId, username) {
+            selectedChatId = userId;
+            document.getElementById('chatTitle').textContent = `چت خصوصی با ${username}`;
+            document.getElementById('messages').innerHTML = '';
+            
+            // Update active chat in sidebar
+            const chatItems = document.querySelectorAll('.chat-item');
+            chatItems.forEach(item => item.classList.remove('active'));
+            
+            // Add or update private chat in sidebar
+            let privateChat = document.querySelector(`.chat-item[data-user-id="${userId}"]`);
+            if (!privateChat) {
+                privateChat = document.createElement('div');
+                privateChat.className = 'chat-item';
+                privateChat.setAttribute('data-user-id', userId);
+                privateChat.innerHTML = `
+                    <div class="chat-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="chat-info">
+                        <span class="chat-name">${username}</span>
+                        <span class="chat-status">آنلاین</span>
+                    </div>
+                `;
+                document.getElementById('privateChats').appendChild(privateChat);
+            }
+            privateChat.classList.add('active');
+        }
+        
+        // بارگذاری پیام‌های خصوصی
+        function loadPrivateMessages(userId) {
+            // TODO: Implement loading private messages
+        }
+        
+        // ویرایش پیام
+        function editMessage(messageId) {
+            const messageDiv = document.getElementById(`message-${messageId}`);
+            const contentDiv = messageDiv.querySelector('.message-content');
+            const currentContent = contentDiv.textContent;
+            
+            contentDiv.innerHTML = `
+                <input type="text" value="${currentContent}">
+                <button onclick="saveEdit('${messageId}')">ذخیره</button>
+                <button onclick="cancelEdit('${messageId}')">انصراف</button>
+            `;
+        }
+        
+        // حذف پیام
+        function deleteMessage(messageId) {
+            if (confirm('آیا از حذف این پیام اطمینان دارید؟')) {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'delete',
+                        message_id: messageId
+                    }));
+                }
+            }
+        }
+        
+        // نمایش خطا
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            document.body.appendChild(errorDiv);
+            setTimeout(() => errorDiv.remove(), 3000);
+        }
+        
+        // مدیریت تایپینگ
+        document.getElementById('messageInput').addEventListener('input', () => {
+            if (!isTyping) {
+                isTyping = true;
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ 
+                        type: 'typing',
+                        receiver_id: selectedChatId || null
+                    }));
+                }
+            }
+            
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                isTyping = false;
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ 
+                        type: 'not_typing',
+                        receiver_id: selectedChatId || null
+                    }));
+                }
+            }, 1000);
+        });
+        
+        // مدیریت ارسال با Enter
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        
+        function showProfileModal() {
+            const modal = document.getElementById('profileModal');
+            modal.style.display = 'block';
+        }
+
+        function hideProfileModal() {
+            const modal = document.getElementById('profileModal');
+            modal.style.display = 'none';
+        }
+
+        function selectChat(chatId) {
+            selectedChatId = chatId;
+            const chatItems = document.querySelectorAll('.chat-item');
+            chatItems.forEach(item => item.classList.remove('active'));
+            document.querySelector(`.chat-item[onclick*="${chatId}"]`).classList.add('active');
+            
+            if (chatId === 'public') {
+                document.getElementById('chatTitle').textContent = 'چت عمومی';
+                document.getElementById('messages').innerHTML = '';
+                loadPublicMessages();
+            } else {
+                const chat = privateChats.get(chatId);
+                document.getElementById('chatTitle').textContent = `چت خصوصی با ${chat.username}`;
+                document.getElementById('messages').innerHTML = '';
+                loadPrivateMessages(chatId);
+            }
+        }
+
+        function loadPublicMessages() {
+            // TODO: Implement loading public messages
+        }
+
+        function loadPrivateMessages(chatId) {
+            // TODO: Implement loading private messages
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('profileModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // اتصال اولیه به WebSocket
+        connectWebSocket();
+
+        async function updateProfile() {
+            const displayName = document.getElementById('displayName').value;
+            const formData = new FormData();
+            formData.append('user_id', userId);
+            formData.append('display_name', displayName);
+            
+            try {
+                const response = await fetch('/profile/update', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('پروفایل با موفقیت به‌روزرسانی شد');
+                    hideProfileModal();
+                } else {
+                    alert(result.message || 'خطا در به‌روزرسانی پروفایل');
+                }
+            } catch (error) {
+                console.error('Error updating profile:', error);
+                alert('خطا در به‌روزرسانی پروفایل');
+            }
+        }
+
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('current_user', userId);
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    const message = {
+                        type: 'message',
+                        content: `فایل: ${result.filename}`,
+                        file_info: {
+                            id: result.file_id,
+                            path: result.file_path,
+                            type: result.message_type
+                        },
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify(message));
+                    } else {
+                        messageQueue.push(message);
+                    }
+                } else {
+                    alert(result.message || 'خطا در آپلود فایل');
+                }
+            } catch (error) {
+                console.error('Error uploading file:', error);
+                alert('خطا در آپلود فایل');
+            }
+        }
+
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                uploadFile(file);
+            }
+        });
+
+        function copyInviteLink() {
+            const inviteLink = document.getElementById('inviteLink');
+            inviteLink.select();
+            document.execCommand('copy');
+            
+            // Show feedback
+            const copyBtn = document.querySelector('.copy-btn');
+            const originalIcon = copyBtn.innerHTML;
+            copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+            setTimeout(() => {
+                copyBtn.innerHTML = originalIcon;
+            }, 2000);
+        }
+    </script>
+</body>
+</html> 
