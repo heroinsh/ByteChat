@@ -16,7 +16,7 @@ sudo apt install python3 python3-pip -y
 echo "Cloning the repository..."
 git clone https://github.com/heroinsh/ByteChat.git
 
-
+echo "change directory..."
 cd ByteChat
 
 
