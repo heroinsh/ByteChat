@@ -1,0 +1,1 @@
+run code = python -m uvicorn main:app --reload
